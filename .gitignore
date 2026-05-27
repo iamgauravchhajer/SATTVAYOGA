@@ -43,6 +43,12 @@ out/
 wrangler.toml.local
 
 # ===========================
+# Vercel
+# ===========================
+# Keep project.json (links repo to Vercel project) but exclude generated build output
+.vercel/output/
+
+# ===========================
 # Firebase
 # ===========================
 .firebase/
