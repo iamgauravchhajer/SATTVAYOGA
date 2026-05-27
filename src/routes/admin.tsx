@@ -43,10 +43,13 @@ import { DEFAULT_CONTENT, type LandingPageContent } from "@/lib/defaultContent";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
+  // Admin is a private, auth-gated tool — no SEO value, uses browser-only APIs
+  // (window, document, canvas, FileReader). Disabling SSR prevents server crashes.
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Admin Portal — SATTVAYOGA 365" },
-      { name: "robots", content: "noindex, nofollow" }, // Secure from search crawlers
+      { name: "robots", content: "noindex, nofollow" }, // Keep out of search engines
     ],
   }),
 });
@@ -388,7 +391,7 @@ function AdminPage() {
   };
 
   const handleDeleteLead = async (leadId: string) => {
-    if (!db || !window.confirm("Are you sure you want to permanently delete this lead?")) return;
+    if (!db || typeof window === "undefined" || !window.confirm("Are you sure you want to permanently delete this lead?")) return;
 
     setIsDeleting(leadId);
     try {
@@ -421,6 +424,7 @@ function AdminPage() {
       [headers.join(","), ...rows.map((r) => r.map((field) => `"${field}"`).join(","))].join("\n");
 
     const encodedUri = encodeURI(csvContent);
+    if (typeof document === "undefined") return;
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
     link.setAttribute(
