@@ -16,6 +16,7 @@ import {
   readdirSync,
   statSync,
   existsSync,
+  rmSync,
 } from "fs";
 import { join } from "path";
 import { execFileSync } from "child_process";
@@ -38,7 +39,8 @@ function copyDir(src, dest) {
   }
 }
 
-// ── 1. Scaffold ───────────────────────────────────────────────────────────────
+// ── 1. Scaffold — wipe and recreate clean dirs each run ──────────────────────
+if (existsSync(OUT)) rmSync(OUT, { recursive: true, force: true });
 mkdirs(STATIC, FUNC);
 console.log("📁  Scaffolded .vercel/output/");
 
@@ -163,19 +165,27 @@ writeFileSync(
 );
 
 // ── 6. Vercel routing config ──────────────────────────────────────────────────
+// CRITICAL: { handle: "filesystem" } tells Vercel to serve files from
+// .vercel/output/static/ BEFORE falling through to the SSR function.
+// Without it, the catch-all '^/(.*)$' intercepts /assets/*.css requests
+// and sends them to the Node.js function instead of the static folder,
+// which is why CSS/JS don't load (just bare HTML with no styles).
 writeFileSync(
   join(OUT, "config.json"),
   JSON.stringify(
     {
       version: 3,
       routes: [
-        // Hashed assets → served from static/, permanent cache
+        // Step 1: Set immutable cache headers on hashed assets (continue processing)
         {
           src: "^/assets/(.+)$",
           headers: { "cache-control": "public, max-age=31536000, immutable" },
           continue: true,
         },
-        // All other requests → SSR Node.js function
+        // Step 2: Serve static files from .vercel/output/static/ if they exist
+        // (this is where /assets/*.css, /assets/*.js, /assets/*.jpg land)
+        { handle: "filesystem" },
+        // Step 3: Everything else (all app routes) → SSR Node.js function
         { src: "^/(.*)$", dest: "/index" },
       ],
     },

@@ -6,7 +6,8 @@ node_modules/
 .pnp.js
 
 # ===========================
-# Environment Variables (NEVER commit — contains Firebase keys & admin emails)
+# Environment Variables
+# NEVER commit — contains Firebase API keys & admin emails
 # ===========================
 .env
 .env.local
@@ -16,14 +17,13 @@ node_modules/
 .env.staging
 .dev.vars
 
-# Keep the example template in repo for reference
+# Keep the safe example template for onboarding
 !.env.example
 
 # ===========================
-# Build Outputs
+# Build Outputs (all generated — never commit)
 # ===========================
 dist/
-dist-ssr/
 build/
 out/
 .output/
@@ -31,7 +31,7 @@ out/
 .nitro/
 
 # ===========================
-# TanStack / Vite Cache
+# TanStack / Vite
 # ===========================
 .tanstack/
 *.local
@@ -44,9 +44,11 @@ wrangler.toml.local
 
 # ===========================
 # Vercel
+# Keep .vercel/project.json (links repo to Vercel project)
+# Exclude the generated build output (recreated by postbuild.mjs on every deploy)
 # ===========================
-# Keep project.json (links repo to Vercel project) but exclude generated build output
 .vercel/output/
+.vercel/cache/
 
 # ===========================
 # Firebase
@@ -80,7 +82,7 @@ Thumbs.db
 desktop.ini
 
 # ===========================
-# Editor & IDE Files
+# Editor & IDE
 # ===========================
 .vscode/*
 !.vscode/extensions.json
@@ -96,7 +98,7 @@ desktop.ini
 .history/
 
 # ===========================
-# Lovable Platform (internal platform config — not needed in repo)
+# Lovable Platform (internal — not needed in repo)
 # ===========================
 .lovable/
 
@@ -114,7 +116,6 @@ coverage/
 # ===========================
 # Misc
 # ===========================
-*.local
 .cache/
 tmp/
 temp/
