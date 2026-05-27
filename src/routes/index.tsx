@@ -1064,6 +1064,15 @@ function Footer({
           >
             Gugichu Technologies
           </a>
+          {" | "}
+          <a
+            href="https://www.instagram.com/gugichu.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-saffron hover:underline transition"
+          >
+            @gugichu.ai
+          </a>
         </span>
       </div>
     </footer>
