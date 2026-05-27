@@ -1,37 +1,34 @@
 #!/usr/bin/env node
 /**
- * postbuild.mjs — Creates a Vercel Build Output API v3 structure from the
- * TanStack Start SSR build output. Runs automatically after `npm run build`
- * via the "postbuild" script in package.json.
+ * postbuild.mjs — Vercel Build Output API v3 packager for TanStack Start.
  *
- * Uses Vercel Node.js serverless runtime (NOT Edge) because the SSR bundle
- * depends on Node.js-only packages (React, Firebase, lucide-react, etc.)
- * which are blocked in the Edge sandbox.
- *
- * Output layout:
- *   .vercel/output/
- *     config.json                    ← routing rules (Vercel v3)
- *     static/assets/                 ← hashed CSS/JS/images (immutable cache)
- *     functions/index.func/
- *       .vc-config.json              ← nodejs20.x runtime declaration
- *       index.js                     ← Node.js http handler (bridges Fetch API ↔ http)
- *       server.js                    ← compiled TanStack SSR server
- *       assets/                      ← all server asset chunks
+ * Strategy:
+ *  1. esbuild bundles dist/server/server.js + ALL its dependencies into one CJS file: _server_bundle.js
+ *  2. We write a thin index.js that requires _server_bundle.js and bridges Node.js ↔ Fetch API
+ *  3. Both files go into .vercel/output/functions/index.func/
+ *  4. Vercel's nodejs20.x runtime runs index.js with module.exports as the handler
  */
 
-import { mkdirSync, copyFileSync, writeFileSync, readdirSync, statSync } from "fs";
+import {
+  mkdirSync,
+  copyFileSync,
+  writeFileSync,
+  readdirSync,
+  statSync,
+  existsSync,
+} from "fs";
 import { join } from "path";
+import { execFileSync } from "child_process";
 
-const ROOT = process.cwd();
-const OUT = join(ROOT, ".vercel/output");
+const ROOT   = process.cwd();
+const OUT    = join(ROOT, ".vercel/output");
 const STATIC = join(OUT, "static");
-const FUNC = join(OUT, "functions/index.func");
+const FUNC   = join(OUT, "functions/index.func");
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function mkdirs(...dirs) {
   dirs.forEach((d) => mkdirSync(d, { recursive: true }));
 }
-
 function copyDir(src, dest) {
   mkdirSync(dest, { recursive: true });
   for (const entry of readdirSync(src)) {
@@ -41,72 +38,86 @@ function copyDir(src, dest) {
   }
 }
 
-// ── 1. Scaffold output dirs ───────────────────────────────────────────────────
-mkdirs(STATIC, FUNC, join(FUNC, "assets"));
-console.log("📁  Created .vercel/output structure");
+// ── 1. Scaffold ───────────────────────────────────────────────────────────────
+mkdirs(STATIC, FUNC);
+console.log("📁  Scaffolded .vercel/output/");
 
-// ── 2. Copy client static assets (JS, CSS, images) ───────────────────────────
+// ── 2. Copy client static assets ─────────────────────────────────────────────
 copyDir(join(ROOT, "dist/client/assets"), join(STATIC, "assets"));
-console.log("📦  Copied client assets → .vercel/output/static/assets/");
+console.log("📦  Client assets → .vercel/output/static/assets/");
 
-// ── 3. Copy the entire server bundle into the Node.js function folder ─────────
-copyFileSync(join(ROOT, "dist/server/server.js"), join(FUNC, "server.js"));
-copyDir(join(ROOT, "dist/server/assets"), join(FUNC, "assets"));
-console.log("🖥️   Copied server bundle → .vercel/output/functions/index.func/");
+// ── 3. Bundle the SSR server with esbuild ────────────────────────────────────
+// We bundle dist/server/server.js on its own (as a library, --format=cjs).
+// esbuild will inline ALL dependencies: react, firebase, h3-v2, seroval, etc.
+// The result is _server_bundle.js with module.exports = { default: server, ... }
+const serverBundlePath = join(FUNC, "_server_bundle.js");
+const esbuildBin       = join(ROOT, "node_modules/.bin/esbuild");
 
-// ── 4. Write the Node.js serverless function entrypoint ──────────────────────
-// TanStack Start server exports: { fetch(Request, env, ctx) => Promise<Response> }
-// Vercel Node.js functions receive:  (req: IncomingMessage, res: ServerResponse)
-// This wrapper bridges between the two interfaces.
+console.log("🔧  Bundling SSR server with esbuild (all deps inlined)...");
+execFileSync(
+  esbuildBin,
+  [
+    "dist/server/server.js",       // Entry: the TanStack Start SSR server
+    "--bundle",                    // Inline all imports from node_modules
+    "--platform=node",             // Target Node.js (externalises built-ins automatically)
+    "--target=node20",
+    "--format=cjs",                // Output CJS so we can require() it
+    "--outfile=" + serverBundlePath,
+    "--log-level=warning",
+    "--main-fields=module,main",
+    "--conditions=import,require,node",
+    "--ignore-annotations",        // Keep bare side-effect imports (h3-v2 etc.)
+    "--external:fsevents",         // macOS native addon — never needed on Linux/Vercel
+  ],
+  { stdio: "inherit", cwd: ROOT },
+);
+console.log("✅  Server bundle → .vercel/output/functions/index.func/_server_bundle.js");
+
+// ── 4. Write the Vercel function handler (index.js) ──────────────────────────
+// This is a plain CJS file. It requires the bundled server and bridges
+// Node.js IncomingMessage/ServerResponse ↔ Fetch API Request/Response.
 writeFileSync(
   join(FUNC, "index.js"),
-  `// Auto-generated by postbuild.mjs — DO NOT EDIT
-// Bridges Vercel Node.js http handler ↔ TanStack Start Fetch API SSR server
-import server from "./server.js";
+  `"use strict";
+// SATTVAYOGA 365 — Vercel SSR Handler
+// Bridges Node.js http ↔ TanStack Start Fetch API server
 
-export default async function handler(req, res) {
+const _mod = require("./_server_bundle.js");
+// The server bundle exports: { default: { fetch(req, env, ctx) => Response } }
+const server = _mod && _mod.default ? _mod.default : _mod;
+
+module.exports = async function handler(req, res) {
   // Reconstruct the full URL from Vercel proxy headers
-  const protocol = req.headers["x-forwarded-proto"] || "https";
-  const host = req.headers["x-forwarded-host"] || req.headers.host || "localhost";
-  const url = new URL(req.url, \`\${protocol}://\${host}\`);
+  const proto = req.headers["x-forwarded-proto"] || "https";
+  const host  = req.headers["x-forwarded-host"] || req.headers.host || "localhost";
+  const url   = new URL(req.url, proto + "://" + host);
 
-  // Convert Node.js headers object to Fetch API Headers
+  // Convert Node.js headers object → Fetch API Headers
   const headers = new Headers();
-  for (const [key, value] of Object.entries(req.headers)) {
-    if (value !== undefined) {
-      headers.set(key, Array.isArray(value) ? value.join(", ") : value);
-    }
+  for (const [k, v] of Object.entries(req.headers)) {
+    if (v !== undefined) headers.set(k, Array.isArray(v) ? v.join(", ") : v);
   }
 
-  // Buffer request body for non-GET requests (forms, API calls, etc.)
-  let body = undefined;
+  // Buffer request body for non-GET requests
   const method = (req.method || "GET").toUpperCase();
+  let body;
   if (method !== "GET" && method !== "HEAD") {
     const chunks = [];
     for await (const chunk of req) {
-      chunks.push(chunk);
+      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
     }
-    if (chunks.length > 0) {
-      body = Buffer.concat(chunks);
-    }
+    if (chunks.length) body = Buffer.concat(chunks);
   }
 
-  // Build the Fetch API Request
-  const fetchRequest = new Request(url.toString(), { method, headers, body });
+  const fetchReq = new Request(url.toString(), { method, headers, body });
 
   try {
-    // Call the TanStack Start SSR handler
-    const response = await server.fetch(fetchRequest, {}, {});
+    const response = await server.fetch(fetchReq, {}, {});
 
-    // Forward status code
     res.statusCode = response.status;
+    for (const [k, v] of response.headers.entries()) res.setHeader(k, v);
 
-    // Forward response headers
-    for (const [key, value] of response.headers.entries()) {
-      res.setHeader(key, value);
-    }
-
-    // Stream response body back to client
+    // Stream response body
     if (response.body) {
       const reader = response.body.getReader();
       while (true) {
@@ -117,46 +128,54 @@ export default async function handler(req, res) {
     }
     res.end();
   } catch (err) {
-    console.error("[SSR] Unhandled error:", err);
+    console.error("[SATTVAYOGA SSR]", err);
     res.statusCode = 500;
     res.setHeader("content-type", "text/plain");
     res.end("Internal Server Error");
   }
-}
+};
 `,
 );
-console.log("⚡  Wrote Node.js serverless function entrypoint");
+console.log("⚡  Handler → .vercel/output/functions/index.func/index.js");
 
-// ── 5. Write .vc-config.json — Node.js runtime (NOT edge) ────────────────────
+// ── Write a local package.json to force CJS mode inside the function dir ─────
+// The project root has "type":"module" which makes ALL .js files ESM by default.
+// A local package.json with "type":"commonjs" overrides this for the func dir.
+writeFileSync(
+  join(FUNC, "package.json"),
+  JSON.stringify({ type: "commonjs" }, null, 2),
+);
+
+// ── 5. .vc-config.json (Node.js 20 runtime) ──────────────────────────────────
 writeFileSync(
   join(FUNC, ".vc-config.json"),
   JSON.stringify(
     {
-      runtime: "nodejs20.x",
-      handler: "index.js",
-      launcherType: "Nodejs",
+      runtime:          "nodejs20.x",
+      handler:          "index.js",
+      launcherType:     "Nodejs",
       shouldAddHelpers: false,
-      maxDuration: 30,
+      maxDuration:      30,
     },
     null,
     2,
   ),
 );
 
-// ── 6. Write the Vercel output routing config ─────────────────────────────────
+// ── 6. Vercel routing config ──────────────────────────────────────────────────
 writeFileSync(
   join(OUT, "config.json"),
   JSON.stringify(
     {
       version: 3,
       routes: [
-        // Serve hashed static assets directly with permanent immutable cache headers
+        // Hashed assets → served from static/, permanent cache
         {
           src: "^/assets/(.+)$",
           headers: { "cache-control": "public, max-age=31536000, immutable" },
           continue: true,
         },
-        // All other requests → SSR Node.js serverless function
+        // All other requests → SSR Node.js function
         { src: "^/(.*)$", dest: "/index" },
       ],
     },
@@ -164,5 +183,5 @@ writeFileSync(
     2,
   ),
 );
-console.log("✅  .vercel/output/config.json written");
-console.log("\n🚀  Vercel Build Output API v3 (Node.js) ready!");
+
+console.log("🚀  .vercel/output/ ready  (Node.js 20 · esbuild self-contained bundle)");
