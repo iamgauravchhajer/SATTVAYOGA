@@ -33,14 +33,10 @@ out/
 # ===========================
 # TanStack / Vite
 # ===========================
-.tanstack/
 *.local
 
-# ===========================
-# Wrangler / Cloudflare Workers
-# ===========================
-.wrangler/
-wrangler.toml.local
+
+
 
 # ===========================
 # Vercel
@@ -100,7 +96,7 @@ desktop.ini
 # ===========================
 # Lovable Platform (internal — not needed in repo)
 # ===========================
-.lovable/
+
 
 # ===========================
 # TypeScript
