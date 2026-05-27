@@ -1,0 +1,114 @@
+# ===========================
+# Dependencies
+# ===========================
+node_modules/
+.pnp
+.pnp.js
+
+# ===========================
+# Environment Variables (NEVER commit — contains Firebase keys & admin emails)
+# ===========================
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.staging
+.dev.vars
+
+# Keep the example template in repo for reference
+!.env.example
+
+# ===========================
+# Build Outputs
+# ===========================
+dist/
+dist-ssr/
+build/
+out/
+.output/
+.vinxi/
+.nitro/
+
+# ===========================
+# TanStack / Vite Cache
+# ===========================
+.tanstack/
+*.local
+
+# ===========================
+# Wrangler / Cloudflare Workers
+# ===========================
+.wrangler/
+wrangler.toml.local
+
+# ===========================
+# Firebase
+# ===========================
+.firebase/
+firebase-debug.log
+firestore-debug.log
+database-rules.bolt
+
+# ===========================
+# Logs
+# ===========================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ===========================
+# OS & System Files
+# ===========================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ===========================
+# Editor & IDE Files
+# ===========================
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.swo
+.history/
+
+# ===========================
+# Lovable Platform (internal platform config — not needed in repo)
+# ===========================
+.lovable/
+
+# ===========================
+# TypeScript
+# ===========================
+*.tsbuildinfo
+
+# ===========================
+# Testing
+# ===========================
+coverage/
+.nyc_output/
+
+# ===========================
+# Misc
+# ===========================
+*.local
+.cache/
+tmp/
+temp/

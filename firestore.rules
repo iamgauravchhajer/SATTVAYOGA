@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Check if the current user is signed in and their email is whitelisted as an administrator.
+    function isAdmin() {
+      return request.auth != null && 
+        request.auth.token.email_verified == true && 
+        (
+          request.auth.token.email == 'gaurav613n@gmail.com' ||
+          request.auth.token.email == 'yagneshc28@gmail.com'
+          // Add any additional whitelisted admin emails below:
+          // || request.auth.token.email == 'your-email@gmail.com'
+        );
+    }
+
+    match /leads/{leadId} {
+      // 1. Anyone (public visitors) can submit a lead form.
+      allow create: if true;
+      
+      // 2. Only whitelisted administrator accounts can read, edit, or delete leads.
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /content/{documentId} {
+      // 1. Public visitors can read page copywriting config.
+      allow read: if true;
+
+      // 2. Only whitelisted administrator accounts can write or update the content.
+      allow write: if isAdmin();
+    }
+  }
+}
