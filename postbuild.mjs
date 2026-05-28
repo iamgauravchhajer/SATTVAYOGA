@@ -21,10 +21,10 @@ import {
 import { join } from "path";
 import { execFileSync } from "child_process";
 
-const ROOT   = process.cwd();
-const OUT    = join(ROOT, ".vercel/output");
+const ROOT = process.cwd();
+const OUT = join(ROOT, ".vercel/output");
 const STATIC = join(OUT, "static");
-const FUNC   = join(OUT, "functions/index.func");
+const FUNC = join(OUT, "functions/index.func");
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function mkdirs(...dirs) {
@@ -53,23 +53,23 @@ console.log("📦  Client assets → .vercel/output/static/assets/");
 // esbuild will inline ALL dependencies: react, firebase, h3-v2, seroval, etc.
 // The result is _server_bundle.js with module.exports = { default: server, ... }
 const serverBundlePath = join(FUNC, "_server_bundle.js");
-const esbuildBin       = join(ROOT, "node_modules/.bin/esbuild");
+const esbuildBin = join(ROOT, "node_modules/.bin/esbuild");
 
 console.log("🔧  Bundling SSR server with esbuild (all deps inlined)...");
 execFileSync(
   esbuildBin,
   [
-    "dist/server/server.js",       // Entry: the TanStack Start SSR server
-    "--bundle",                    // Inline all imports from node_modules
-    "--platform=node",             // Target Node.js (externalises built-ins automatically)
+    "dist/server/server.js", // Entry: the TanStack Start SSR server
+    "--bundle", // Inline all imports from node_modules
+    "--platform=node", // Target Node.js (externalises built-ins automatically)
     "--target=node20",
-    "--format=cjs",                // Output CJS so we can require() it
+    "--format=cjs", // Output CJS so we can require() it
     "--outfile=" + serverBundlePath,
     "--log-level=warning",
     "--main-fields=module,main",
     "--conditions=import,require,node",
-    "--ignore-annotations",        // Keep bare side-effect imports (h3-v2 etc.)
-    "--external:fsevents",         // macOS native addon — never needed on Linux/Vercel
+    "--ignore-annotations", // Keep bare side-effect imports (h3-v2 etc.)
+    "--external:fsevents", // macOS native addon — never needed on Linux/Vercel
   ],
   { stdio: "inherit", cwd: ROOT },
 );
@@ -143,21 +143,18 @@ console.log("⚡  Handler → .vercel/output/functions/index.func/index.js");
 // ── Write a local package.json to force CJS mode inside the function dir ─────
 // The project root has "type":"module" which makes ALL .js files ESM by default.
 // A local package.json with "type":"commonjs" overrides this for the func dir.
-writeFileSync(
-  join(FUNC, "package.json"),
-  JSON.stringify({ type: "commonjs" }, null, 2),
-);
+writeFileSync(join(FUNC, "package.json"), JSON.stringify({ type: "commonjs" }, null, 2));
 
 // ── 5. .vc-config.json (Node.js 20 runtime) ──────────────────────────────────
 writeFileSync(
   join(FUNC, ".vc-config.json"),
   JSON.stringify(
     {
-      runtime:          "nodejs20.x",
-      handler:          "index.js",
-      launcherType:     "Nodejs",
+      runtime: "nodejs20.x",
+      handler: "index.js",
+      launcherType: "Nodejs",
       shouldAddHelpers: false,
-      maxDuration:      30,
+      maxDuration: 30,
     },
     null,
     2,

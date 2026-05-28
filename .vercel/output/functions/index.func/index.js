@@ -9,8 +9,8 @@ const server = _mod && _mod.default ? _mod.default : _mod;
 module.exports = async function handler(req, res) {
   // Reconstruct the full URL from Vercel proxy headers
   const proto = req.headers["x-forwarded-proto"] || "https";
-  const host  = req.headers["x-forwarded-host"] || req.headers.host || "localhost";
-  const url   = new URL(req.url, proto + "://" + host);
+  const host = req.headers["x-forwarded-host"] || req.headers.host || "localhost";
+  const url = new URL(req.url, proto + "://" + host);
 
   // Convert Node.js headers object → Fetch API Headers
   const headers = new Headers();

@@ -391,7 +391,12 @@ function AdminPage() {
   };
 
   const handleDeleteLead = async (leadId: string) => {
-    if (!db || typeof window === "undefined" || !window.confirm("Are you sure you want to permanently delete this lead?")) return;
+    if (
+      !db ||
+      typeof window === "undefined" ||
+      !window.confirm("Are you sure you want to permanently delete this lead?")
+    )
+      return;
 
     setIsDeleting(leadId);
     try {

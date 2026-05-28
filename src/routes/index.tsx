@@ -1057,7 +1057,7 @@ function Footer({
         <span>
           Made by{" "}
           <a
-            href="https://www.instagram.com/iamgauravchhajer"
+            href="https://www.instagram.com/gugichu.ai"
             target="_blank"
             rel="noopener noreferrer"
             className="font-semibold text-saffron hover:underline transition"
